@@ -50,7 +50,7 @@ while getopts "iprsb:t:g:hn" option; do
         b) BRANCH="${OPTARG}" ;;
         t) TARGET="${OPTARG}" ;;
         g) REMOTE="${OPTARG}" ;;
-        h) 
+        h)
             shelp
             exit 0
             ;;
@@ -108,20 +108,28 @@ elif [ "$INSTALL" = 1 ]; then
         echo
         exit 1
     fi
-    
+
     # Prompt user for configuration
     echo "${white}"
-    read -p " Please enter your ${green}GitHub username${white} and press Enter: ${yellow}" USER_NAME
+    read -p " Please enter your ${green}Git URL${white} and press Enter: ${yellow}" GIT_URL
+    while [ -z "$GIT_URL" ]; do
+        echo "${white}"
+        echo "${darkred} ✗ Invalid Git URL!${white}"
+        echo
+        read -p " Please enter your ${green}Git URL${white} and press Enter: ${yellow}" GIT_URL
+    done
+    echo "${white}"
+    read -p " Please enter your ${green}Git username${white} and press Enter: ${yellow}" USER_NAME
     while [ -z "$USER_NAME" ]; do
         echo "${white}"
-        echo "${darkred} ✗ Invalid GitHub username!${white}"
+        echo "${darkred} ✗ Invalid Git username!${white}"
         echo
-        read -p " Please enter your ${green}GitHub username${white} and press Enter: ${yellow}" USER_NAME
+        read -p " Please enter your ${green}Git username${white} and press Enter: ${yellow}" USER_NAME
     done
     valid_email=false
     while [ "$valid_email" != true ]; do
         echo "${white}"
-        read -p " Please enter your ${green}GitHub email address${white} and press Enter: ${yellow}" USER_MAIL
+        read -p " Please enter your ${green}Git email address${white} and press Enter: ${yellow}" USER_MAIL
         echo "$USER_MAIL" | grep -E -q "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
         if [ $? -ne 0 ]; then
             echo "${white}"
@@ -131,40 +139,40 @@ elif [ "$INSTALL" = 1 ]; then
         fi
     done
     echo "${white}"
-    read -p " Please enter your ${green}GitHub repository name${white} and press Enter: ${yellow}" REPO_NAME
+    read -p " Please enter your ${green}Git repository name${white} and press Enter: ${yellow}" REPO_NAME
     while [ -z "$REPO_NAME" ]; do
         echo "${white}"
-        echo "${darkred} ✗ Invalid GitHub repository name!${white}"
+        echo "${darkred} ✗ Invalid Git repository name!${white}"
         echo
-        read -p " Please enter your ${green}GitHub repository name${white} and press Enter: ${yellow}" REPO_NAME
+        read -p " Please enter your ${green}Git repository name${white} and press Enter: ${yellow}" REPO_NAME
     done
     echo "${white}"
-    read -p " Please enter your ${green}GitHub branch name${white} and press Enter: ${yellow}" REPO_BRANCH
+    read -p " Please enter your ${green}Git branch name${white} and press Enter: ${yellow}" REPO_BRANCH
     while [ -z "$REPO_BRANCH" ]; do
         echo "${white}"
-        echo "${darkred} ✗ Invalid GitHub branch name!${white}"
+        echo "${darkred} ✗ Invalid Git branch name!${white}"
         echo
-        read -p " Please enter your ${green}GitHub branch name${white} and press Enter: ${yellow}" REPO_BRANCH
+        read -p " Please enter your ${green}Git branch name${white} and press Enter: ${yellow}" REPO_BRANCH
     done
     echo "${white}"
-    read -p " Please enter your ${green}GitHub personal access token${white} and press Enter: ${yellow}" GITHUB_TOKEN
-    while [ -z "$GITHUB_TOKEN" ]; do
+    read -p " Please enter your ${green}Git personal access token${white} and press Enter: ${yellow}" GIT_ACCESS_TOKEN
+    while [ -z "$GIT_ACCESS_TOKEN" ]; do
         echo "${white}"
-        echo "${darkred} ✗ Invalid GitHub personal access token!${white}"
+        echo "${darkred} ✗ Invalid Git personal access token!${white}"
         echo
-        read -p " Please enter your ${green}GitHub personal access token${white} and press Enter: ${yellow}" GITHUB_TOKEN
+        read -p " Please enter your ${green}Git personal access token${white} and press Enter: ${yellow}" GIT_ACCESS_TOKEN
     done
     echo "${white}"
-    
+
     # Folder to be watched
     IFS=/usr/data/printer_data/config
-    
-    # Connect config directory to github
+
+    # Connect config directory to git
     cd "$IFS" || exit
     git config --global user.name "$USER_NAME"
     git config --global user.email "$USER_MAIL"
     git init
-    git remote add origin "https://$USER_NAME:$GITHUB_TOKEN@github.com/$USER_NAME/$REPO_NAME.git"
+    git remote add origin "https://$USER_NAME:$GIT_ACCESS_TOKEN@$GIT_URL/$USER_NAME/$REPO_NAME.git"
     git checkout -b "$REPO_BRANCH"
     git add .
     git commit -m "Initial Backup"
@@ -212,24 +220,25 @@ elif [ "$INSTALL" = 1 ]; then
         killall -q inotifywait >/dev/null 2>&1
         /opt/bin/opkg --autoremove remove inotifywait >/dev/null 2>&1
         echo "${white}${darkred} ✗ Authentication failed!"
-        echo "   Check your GitHub personal access token and restart Git Backup installation.${white}"
+        echo "   Check your Git server personal access token and restart Git Backup installation.${white}"
         echo
         exit 0
     else
-        git push -u origin "$REPO_BRANCH" 
+        git push -u origin "$REPO_BRANCH"
     fi
-    
+
     # Write configuration to .env file
     if [ ! -d /usr/data/helper-script-backup/git-backup ]; then
         mkdir -p /usr/data/helper-script-backup/git-backup
     fi
     ENV=/usr/data/helper-script-backup/git-backup/.env
     echo "IFS=$IFS" > "$ENV"
-    echo "GITHUB_TOKEN=$GITHUB_TOKEN" >> "$ENV"
+    echo "GIT_ACCESS_TOKEN=$GIT_ACCESS_TOKEN" >> "$ENV"
     echo "REMOTE=$REPO_NAME" >> "$ENV"
     echo "BRANCH=$REPO_BRANCH" >> "$ENV"
     echo "USER=$USER_NAME" >> "$ENV"
-    
+    echo "GIT_URL=$GIT_URL" >> "$ENV"
+
     # Insert .env to init.d
     echo "Info: Copying file..."
     cp -f /usr/data/helper-script/files/git-backup/S52Git-Backup /etc/init.d/S52Git-Backup
